@@ -43,7 +43,7 @@ type Cache[K comparable, V any] interface {
 	// Get returns the value of the key if the key exists in the cache,
 	// otherwise, returns ErrKeyNotFound.
 	//
-	// O(1)
+	// O(1), not amortized
 	Get(key K) (V, error)
 
 	// Put updates the value of the key if present, or inserts the key if not already present.
@@ -52,29 +52,29 @@ type Cache[K comparable, V any] interface {
 	// before inserting a new item. For this problem, when there is a tie
 	// (i.e., two or more keys with the same frequency), the least recently used key would be invalidated.
 	//
-	// O(1)
+	// O(1), not amortized
 	Put(key K, value V)
 
 	// All returns the iterator in descending order of frequency.
 	// If two or more keys have the same frequency, the most recently used key will be listed first.
 	//
-	// O(capacity)
+	// O(capacity), not amortized
 	All() iter.Seq2[K, V]
 
 	// Size returns the cache size.
 	//
-	// O(1)
+	// O(1), not amortized
 	Size() int
 
 	// Capacity returns the cache capacity.
 	//
-	// O(1)
+	// O(1), not amortized
 	Capacity() int
 
 	// GetKeyFrequency returns the element's frequency if the key exists in the cache,
 	// otherwise, returns ErrKeyNotFound.
 	//
-	// O(1)
+	// O(1), not amortized
 	GetKeyFrequency(key K) (int, error)
 }
 
