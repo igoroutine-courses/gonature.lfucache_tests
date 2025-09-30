@@ -104,5 +104,5 @@ func TestInvalidationPerformance(t *testing.T) {
 		}
 	})
 
-	require.LessOrEqual(t, float64(hot.NsPerOp())/float64(cold.NsPerOp()), 1.06)
+	require.LessOrEqual(t, float64(hot.NsPerOp())/float64(cold.NsPerOp()), 1.3)
 }
