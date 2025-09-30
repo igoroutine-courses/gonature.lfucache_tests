@@ -1,0 +1,108 @@
+//go:build performance_test
+
+package lfucache
+
+import (
+	"math/rand/v2"
+	"slices"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestGetPutPerformance(t *testing.T) {
+	cache := testing.Benchmark(func(b *testing.B) {
+		c := New[int, int](100)
+		b.ResetTimer()
+
+		for b.Loop() {
+			c.Put(rand.N[int](10), rand.N[int](10))
+			c.Get(rand.N[int](10))
+		}
+	})
+
+	emulator := testing.Benchmark(func(b *testing.B) {
+		a := make(map[int]int)
+		b.ResetTimer()
+
+		for b.Loop() {
+			a[rand.N[int](10)]++
+			a[rand.N[int](10)]++
+		}
+	})
+
+	require.LessOrEqual(t, float64(cache.NsPerOp())/float64(emulator.NsPerOp()), 14.)
+}
+
+func TestIteratorPerformance(t *testing.T) {
+	cache := testing.Benchmark(func(b *testing.B) {
+		c := New[int, int](10)
+
+		for i := 0; i < 10e7; i++ {
+			c.Put(-42, -42)
+		}
+
+		for i := 1; i <= 9; i++ {
+			for range i * 10_000 {
+				c.Put(i, i)
+			}
+		}
+
+		for b.Loop() {
+			collect(c.All())
+		}
+	})
+
+	emulator := testing.Benchmark(func(b *testing.B) {
+		m := make([]int, 10)
+
+		for i := 0; i < len(m); i++ {
+			m[i] = i
+		}
+
+		for b.Loop() {
+			collect(slices.Backward(m))
+		}
+	})
+
+	require.LessOrEqual(t, float64(cache.NsPerOp())/float64(emulator.NsPerOp()), 4.)
+}
+func TestInvalidationPerformance(t *testing.T) {
+	hot := testing.Benchmark(func(b *testing.B) {
+		hotCache := New[int, int](1)
+
+		for b.Loop() {
+			for range 10000 {
+				hotCache.Put(42, 42)
+			}
+
+			hotCache.Put(1, 1)
+			frequency, err := hotCache.GetKeyFrequency(1)
+			require.NoError(t, err)
+			require.Equal(t, 1, frequency)
+
+			oldFrequency, err := hotCache.GetKeyFrequency(42)
+			require.ErrorIs(t, err, ErrKeyNotFound)
+			require.Zero(t, oldFrequency)
+		}
+	})
+
+	cold := testing.Benchmark(func(b *testing.B) {
+		coldCache := New[int, int](2)
+
+		for b.Loop() {
+			for range 10000 {
+				coldCache.Put(42, 42)
+			}
+
+			coldCache.Put(42, 42)
+			_, err := coldCache.GetKeyFrequency(42)
+			require.NoError(t, err)
+
+			_, err = coldCache.GetKeyFrequency(43)
+			require.ErrorIs(t, err, ErrKeyNotFound)
+		}
+	})
+
+	require.LessOrEqual(t, float64(hot.NsPerOp())/float64(cold.NsPerOp()), 1.06)
+}
