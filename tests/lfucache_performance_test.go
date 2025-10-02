@@ -5,6 +5,7 @@ package lfucache
 import (
 	"math/rand/v2"
 	"runtime"
+	"runtime/debug"
 	"slices"
 	"testing"
 
@@ -70,6 +71,11 @@ func TestIteratorPerformance(t *testing.T) {
 }
 
 func TestIteratorAllocs(t *testing.T) {
+	debug.SetGCPercent(1000)
+	t.Cleanup(func() {
+		debug.SetGCPercent(100)
+	})
+
 	for range 5 {
 		c := New[int, int](10_000)
 
@@ -79,6 +85,7 @@ func TestIteratorAllocs(t *testing.T) {
 			}
 		}
 
+		runtime.GC()
 		var stats runtime.MemStats
 		runtime.ReadMemStats(&stats)
 		before := stats.TotalAlloc
@@ -95,11 +102,15 @@ func TestIteratorAllocs(t *testing.T) {
 }
 
 func TestPutAllocs(t *testing.T) {
+	debug.SetGCPercent(1000)
+	t.Cleanup(func() {
+		debug.SetGCPercent(100)
+	})
+
 	for range 100 {
 		cache := New[int, int](100)
 
 		cache.Put(1, 1)
-
 		cache.Put(2, 2)
 		cache.Get(2)
 
@@ -111,16 +122,17 @@ func TestPutAllocs(t *testing.T) {
 			cache.Put(i, i)
 		}
 
+		runtime.GC()
 		var stats runtime.MemStats
 		runtime.ReadMemStats(&stats)
-		before := stats.Alloc
+		before := stats.TotalAlloc
 
 		for i := 3; i <= 100; i++ {
 			cache.Put(i, i)
 		}
 
 		runtime.ReadMemStats(&stats)
-		after := stats.Alloc
+		after := stats.TotalAlloc
 
 		require.Zero(t, after-before)
 	}
