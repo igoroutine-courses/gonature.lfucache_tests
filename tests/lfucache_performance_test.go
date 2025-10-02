@@ -4,6 +4,7 @@ package lfucache
 
 import (
 	"math/rand/v2"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -67,6 +68,64 @@ func TestIteratorPerformance(t *testing.T) {
 
 	require.LessOrEqual(t, float64(cache.NsPerOp())/float64(emulator.NsPerOp()), 4.)
 }
+
+func TestIteratorAllocs(t *testing.T) {
+	for range 5 {
+		c := New[int, int](10_000)
+
+		for i := 1; i <= 10_000; i++ {
+			for range i {
+				c.Put(i, i)
+			}
+		}
+
+		var stats runtime.MemStats
+		runtime.ReadMemStats(&stats)
+		before := stats.TotalAlloc
+
+		c.All()(func(i int, i2 int) bool {
+			return false
+		})
+
+		runtime.ReadMemStats(&stats)
+		after := stats.TotalAlloc
+
+		require.LessOrEqual(t, after-before, uint64(1<<12))
+	}
+}
+
+func TestPutAllocs(t *testing.T) {
+	for range 100 {
+		cache := New[int, int](100)
+
+		cache.Put(1, 1)
+
+		cache.Put(2, 2)
+		cache.Get(2)
+
+		for range 10_000 {
+			cache.Put(27000, 27000)
+		}
+
+		for i := 3; i <= 100; i++ {
+			cache.Put(i, i)
+		}
+
+		var stats runtime.MemStats
+		runtime.ReadMemStats(&stats)
+		before := stats.Alloc
+
+		for i := 3; i <= 100; i++ {
+			cache.Put(i, i)
+		}
+
+		runtime.ReadMemStats(&stats)
+		after := stats.Alloc
+
+		require.Zero(t, after-before)
+	}
+}
+
 func TestInvalidationPerformance(t *testing.T) {
 	hot := testing.Benchmark(func(b *testing.B) {
 		hotCache := New[int, int](1)
