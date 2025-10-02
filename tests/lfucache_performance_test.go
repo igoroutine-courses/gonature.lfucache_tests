@@ -125,14 +125,47 @@ func TestPutAllocs(t *testing.T) {
 		runtime.GC()
 		var stats runtime.MemStats
 		runtime.ReadMemStats(&stats)
-		before := stats.TotalAlloc
+		before := stats.Mallocs
 
 		for i := 3; i <= 100; i++ {
 			cache.Put(i, i)
 		}
 
 		runtime.ReadMemStats(&stats)
-		after := stats.TotalAlloc
+		after := stats.Mallocs
+
+		require.Zero(t, after-before)
+	}
+}
+
+func TestPutAllocsWithInvalidation(t *testing.T) {
+	debug.SetGCPercent(1000)
+	t.Cleanup(func() {
+		debug.SetGCPercent(100)
+	})
+
+	const count = 10_000
+	for range 1 {
+		cache := New[int, int](count)
+
+		for i := 1; i <= count; i++ {
+			for range i {
+				cache.Put(i, i)
+			}
+		}
+
+		runtime.GC()
+		var stats runtime.MemStats
+		runtime.ReadMemStats(&stats)
+		before := stats.Mallocs
+
+		for i := count / 2; i < count; i++ {
+			cache.Put(i, i)
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&stats)
+		after := stats.Mallocs
 
 		require.Zero(t, after-before)
 	}
