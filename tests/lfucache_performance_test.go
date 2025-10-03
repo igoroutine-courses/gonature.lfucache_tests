@@ -3,7 +3,6 @@
 package lfucache
 
 import (
-	"fmt"
 	"math/rand/v2"
 	"runtime"
 	"runtime/debug"
@@ -63,7 +62,6 @@ func TestGetPutPerformanceWithHotCache(t *testing.T) {
 		}
 	})
 
-	fmt.Println(float64(cache.NsPerOp()) / float64(emulator.NsPerOp()))
 	require.LessOrEqual(t, float64(cache.NsPerOp())/float64(emulator.NsPerOp()), 20.)
 }
 
