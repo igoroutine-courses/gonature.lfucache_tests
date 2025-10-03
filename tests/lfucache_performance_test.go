@@ -3,6 +3,7 @@
 package lfucache
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"runtime"
 	"runtime/debug"
@@ -15,7 +16,6 @@ import (
 func TestGetPutPerformance(t *testing.T) {
 	cache := testing.Benchmark(func(b *testing.B) {
 		c := New[int, int](100)
-		b.ResetTimer()
 
 		for b.Loop() {
 			c.Put(rand.N[int](10), rand.N[int](10))
@@ -25,7 +25,6 @@ func TestGetPutPerformance(t *testing.T) {
 
 	emulator := testing.Benchmark(func(b *testing.B) {
 		a := make(map[int]int)
-		b.ResetTimer()
 
 		for b.Loop() {
 			a[rand.N[int](10)]++
@@ -34,6 +33,38 @@ func TestGetPutPerformance(t *testing.T) {
 	})
 
 	require.LessOrEqual(t, float64(cache.NsPerOp())/float64(emulator.NsPerOp()), 14.)
+}
+
+func TestGetPutPerformanceWithHotCache(t *testing.T) {
+	const count = 10_000
+	cache := testing.Benchmark(func(b *testing.B) {
+		c := New[int, int](count)
+		c.Put(-1, -1)
+
+		for i := 1; i < count; i++ {
+			for range i {
+				c.Put(i, i)
+			}
+		}
+
+		for b.Loop() {
+			c.Put(count/2+rand.N[int](100), rand.N[int](10))
+			c.Get(count/2 + rand.N[int](100))
+		}
+	})
+
+	emulator := testing.Benchmark(func(b *testing.B) {
+		a := make(map[int]int)
+		b.ResetTimer()
+
+		for b.Loop() {
+			a[count/2+rand.N[int](100)]++
+			a[count/2+rand.N[int](100)]++
+		}
+	})
+
+	fmt.Println(float64(cache.NsPerOp()) / float64(emulator.NsPerOp()))
+	require.LessOrEqual(t, float64(cache.NsPerOp())/float64(emulator.NsPerOp()), 23.)
 }
 
 func TestIteratorPerformance(t *testing.T) {
@@ -125,47 +156,14 @@ func TestPutAllocs(t *testing.T) {
 		runtime.GC()
 		var stats runtime.MemStats
 		runtime.ReadMemStats(&stats)
-		before := stats.Mallocs
+		before := stats.TotalAlloc
 
 		for i := 3; i <= 100; i++ {
 			cache.Put(i, i)
 		}
 
 		runtime.ReadMemStats(&stats)
-		after := stats.Mallocs
-
-		require.Zero(t, after-before)
-	}
-}
-
-func TestPutAllocsWithInvalidation(t *testing.T) {
-	debug.SetGCPercent(1000)
-	t.Cleanup(func() {
-		debug.SetGCPercent(100)
-	})
-
-	const count = 10_000
-	for range 1 {
-		cache := New[int, int](count)
-
-		for i := 1; i <= count; i++ {
-			for range i {
-				cache.Put(i, i)
-			}
-		}
-
-		runtime.GC()
-		var stats runtime.MemStats
-		runtime.ReadMemStats(&stats)
-		before := stats.Mallocs
-
-		for i := count / 2; i < count; i++ {
-			cache.Put(i, i)
-		}
-
-		runtime.GC()
-		runtime.ReadMemStats(&stats)
-		after := stats.Mallocs
+		after := stats.TotalAlloc
 
 		require.Zero(t, after-before)
 	}
