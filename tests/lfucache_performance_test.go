@@ -36,7 +36,7 @@ func TestGetPutPerformance(t *testing.T) {
 }
 
 func TestGetPutPerformanceWithHotCache(t *testing.T) {
-	const count = 10_000
+	const count = 1000
 	cache := testing.Benchmark(func(b *testing.B) {
 		c := New[int, int](count)
 		c.Put(-1, -1)
@@ -64,7 +64,7 @@ func TestGetPutPerformanceWithHotCache(t *testing.T) {
 	})
 
 	fmt.Println(float64(cache.NsPerOp()) / float64(emulator.NsPerOp()))
-	require.LessOrEqual(t, float64(cache.NsPerOp())/float64(emulator.NsPerOp()), 23.)
+	require.LessOrEqual(t, float64(cache.NsPerOp())/float64(emulator.NsPerOp()), 20.)
 }
 
 func TestIteratorPerformance(t *testing.T) {
