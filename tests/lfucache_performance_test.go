@@ -100,9 +100,11 @@ func TestIteratorPerformance(t *testing.T) {
 }
 
 func TestIteratorAllocs(t *testing.T) {
-	debug.SetGCPercent(1000)
+	debug.SetGCPercent(-1)
+	prev := runtime.GOMAXPROCS(1)
 	t.Cleanup(func() {
 		debug.SetGCPercent(100)
+		runtime.GOMAXPROCS(prev)
 	})
 
 	for range 5 {
@@ -130,10 +132,54 @@ func TestIteratorAllocs(t *testing.T) {
 	}
 }
 
-func TestPutAllocs(t *testing.T) {
-	debug.SetGCPercent(1000)
+// TestNodeReclaiming
+// When deleting, the old node is reused
+func TestNodeReclaiming(t *testing.T) {
+	debug.SetGCPercent(-1)
+	prev := runtime.GOMAXPROCS(1)
 	t.Cleanup(func() {
 		debug.SetGCPercent(100)
+		runtime.GOMAXPROCS(prev)
+	})
+
+	for range 1000 {
+		cache := New[int, int](149)
+
+		for i := 1; i <= 50; i++ {
+			cache.Put(i, i)
+		}
+
+		for i := 52; i <= 150; i++ {
+			for range i - 50 {
+				cache.Put(i, i)
+			}
+		}
+
+		runtime.GC()
+		var stats runtime.MemStats
+		runtime.ReadMemStats(&stats)
+		before := stats.Mallocs
+
+		for i := -50; i < -1; i++ {
+			for range i * -1 {
+				cache.Put(i, i)
+			}
+		}
+
+		runtime.ReadMemStats(&stats)
+		after := stats.Mallocs
+
+		require.Zero(t, after-before)
+	}
+}
+
+func TestPutAllocs(t *testing.T) {
+	debug.SetGCPercent(-1)
+	prev := runtime.GOMAXPROCS(1)
+
+	t.Cleanup(func() {
+		debug.SetGCPercent(100)
+		runtime.GOMAXPROCS(prev)
 	})
 
 	for range 100 {
@@ -154,14 +200,14 @@ func TestPutAllocs(t *testing.T) {
 		runtime.GC()
 		var stats runtime.MemStats
 		runtime.ReadMemStats(&stats)
-		before := stats.TotalAlloc
+		before := stats.Mallocs
 
 		for i := 3; i <= 100; i++ {
 			cache.Put(i, i)
 		}
 
 		runtime.ReadMemStats(&stats)
-		after := stats.TotalAlloc
+		after := stats.Mallocs
 
 		require.Zero(t, after-before)
 	}
