@@ -142,16 +142,24 @@ func TestNodeReclaiming(t *testing.T) {
 		runtime.GOMAXPROCS(prev)
 	})
 
-	for range 1000 {
+	for option := 0; option < 10000; option++ {
 		cache := New[int, int](149)
 
-		for i := 1; i <= 50; i++ {
-			cache.Put(i, i)
-		}
-
-		for i := 52; i <= 150; i++ {
-			for range i - 50 {
+		if option%2 == 0 {
+			for i := 1; i <= 50; i++ {
 				cache.Put(i, i)
+			}
+
+			for i := 52; i <= 150; i++ {
+				for range i - 50 {
+					cache.Put(i, i)
+				}
+			}
+		} else {
+			for i := 2; i <= 150; i++ {
+				for range i - 1 {
+					cache.Put(i, i)
+				}
 			}
 		}
 
