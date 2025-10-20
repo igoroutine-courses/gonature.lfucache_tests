@@ -241,18 +241,26 @@ func TestCacheSize(t *testing.T) {
 	require.Equal(t, 1, cache.Size())
 }
 
-func TestNegativeCapacityPanics(t *testing.T) {
+func TestNotPositiveCapacityPanics(t *testing.T) {
 	t.Parallel()
 
 	require.Panics(t, func() {
+		New[int, int](0)
+	})
+
+	require.Panics(t, func() {
 		New[int, int](-1)
+	})
+
+	require.Panics(t, func() {
+		New[int, int](-2)
 	})
 }
 
 func TestGetKeyFrequencyNonExistent(t *testing.T) {
 	t.Parallel()
 
-	cache := New[int, int](0)
+	cache := New[int, int](1)
 
 	_, err := cache.GetKeyFrequency(1)
 	require.ErrorIs(t, err, ErrKeyNotFound)

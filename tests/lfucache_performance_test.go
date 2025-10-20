@@ -173,6 +173,42 @@ func TestNodeReclaiming(t *testing.T) {
 	}
 }
 
+// TestListReclaiming
+// When deleting, the old list is reused
+func TestListReclaiming(t *testing.T) {
+	prev := runtime.GOMAXPROCS(1)
+	t.Cleanup(func() {
+		debug.SetGCPercent(100)
+		runtime.GOMAXPROCS(prev)
+	})
+
+	for range 100 {
+		cache := New[int, int](100)
+
+		for i := 1; i <= 1000; i++ {
+			for range i {
+				cache.Put(i, i)
+			}
+		}
+
+		runtime.GC()
+		var stats runtime.MemStats
+		runtime.ReadMemStats(&stats)
+		before := stats.Mallocs
+
+		for i := 1000; i >= 1; i-- {
+			cache.Put(i, i)
+		}
+
+		cache.Put(-1, -1)
+
+		runtime.ReadMemStats(&stats)
+		after := stats.Mallocs
+
+		require.Zero(t, after-before)
+	}
+}
+
 func TestPutAllocs(t *testing.T) {
 	debug.SetGCPercent(-1)
 	prev := runtime.GOMAXPROCS(1)
